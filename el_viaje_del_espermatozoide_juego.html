@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El viaje del espermatozoide</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#071b3a,#123d68);color:#fff;min-height:100vh}
+.app{max-width:900px;margin:auto;padding:24px}
+.card{background:rgba(255,255,255,.10);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:28px;box-shadow:0 12px 35px rgba(0,0,0,.25)}
+h1,h2{margin-top:0}
+h1{font-size:clamp(2rem,6vw,4rem);text-align:center}
+.subtitle{text-align:center;font-size:1.2rem}
+.hidden{display:none!important}
+button{border:0;border-radius:14px;padding:14px 20px;margin:7px;cursor:pointer;font-size:1rem;font-weight:700;background:#fff;color:#123d68;transition:.2s}
+button:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.choice{display:block;width:100%;text-align:left;background:rgba(255,255,255,.94);margin:10px 0}
+.correct{background:#8ee6a6!important}
+.wrong{background:#ff9b9b!important}
+.progress{height:12px;background:rgba(255,255,255,.2);border-radius:20px;overflow:hidden;margin:15px 0 25px}
+.bar{height:100%;width:0;background:#fff;transition:.4s}
+.stage{font-size:.9rem;opacity:.85}
+.feedback{padding:14px;border-radius:14px;margin-top:15px;font-weight:700}
+.good{background:rgba(78,220,120,.22)}
+.bad{background:rgba(255,90,90,.22)}
+.route{font-size:1.1rem;line-height:1.7}
+.drag-list{display:grid;gap:10px}
+.order-item{padding:14px;background:rgba(255,255,255,.94);color:#123d68;border-radius:12px;cursor:grab;font-weight:700}
+.small{opacity:.8;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="game" class="card">
+    <div id="screen"></div>
+  </div>
+</div>
+
+<script>
+const stages = [
+{title:"🏁 El inicio — Los testículos", text:"Aquí comienza todo. Los espermatozoides se producen en los túbulos seminíferos de los testículos, de forma continua desde la pubertad. ¡Es tu punto de partida!",
+q:"¿Dónde se producen los espermatozoides?", options:["En la próstata","En los testículos","En el pene","En las vesículas seminales"], correct:1},
+{title:"🔬 Maduración — El epidídimo", text:"Los espermatozoides pasan de 4 a 12 días aquí. Antes no podían nadar ni fecundar. Al salir, ya están maduros y listos para el viaje.",
+q:"Al salir de los testículos, los espermatozoides ya son completamente maduros.", options:["Verdadero","Falso"], correct:1},
+{title:"🛣️ El camino — Conducto deferente", text:"Conecta el epidídimo con la uretra. Durante la eyaculación, fuertes contracciones los empujan hacia afuera.",
+q:"Elegí la pareja correcta para cada órgano:", match:true},
+{title:"💧 Se forma el semen — Glándulas y uretra", text:"Las vesículas seminales y la próstata añaden líquidos que nutren y protegen. La uretra es el conducto final de salida. ¡Adelante!",
+order:true},
+{title:"🌿 La carrera continúa — La vagina", text:"Tras la eyaculación, millones parten. El ambiente es diferente y muchos no sobreviven. La meta está lejos.",
+q:"¿Cuál es el orden verdadero tras entrar a la vagina?", options:["Vagina → Útero → Cérvix → Trompa","Vagina → Cérvix → Útero → Trompa","Vagina → Trompa → Cérvix → Útero"], correct:1},
+{title:"🔒 La barrera — El cérvix", text:"El moco cervical filtra: solo los más rápidos y sanos pasan. De millones, quedan unos pocos miles.",
+q:"¿Qué función cumple el cérvix?", options:["Produce óvulos","Filtra y selecciona espermatozoides","Lugar de fecundación","Nutre al embrión"], correct:1},
+{title:"🏠 Hacia la meta — El útero", text:"Las contracciones musculares te ayudan a avanzar. Ya casi llegás. La trompa de Falopio está cerca.",
+q:"Completá: Los espermatozoides son atraídos hacia la ______, donde puede ocurrir el encuentro.", options:["Trompa de Falopio","Próstata","Vagina","Ovario"], correct:0},
+{title:"🌈 El lugar del encuentro — Trompa de Falopio", text:"¡Estás aquí! El óvulo fue liberado por un ovario y viaja por la trompa. Tienes solo unas 24 horas. ¡Date prisa!",
+q:"¿Dónde se produce la fecundación?", options:["En el útero","En el ovario","En la trompa de Falopio","En la vagina"], correct:2}
+];
+
+let current=-1, score=0;
+
+function renderStart(){
+document.getElementById("screen").innerHTML=`
+<h1>🧬 EL VIAJE DEL ESPERMATOZOIDE</h1>
+<p class="subtitle">¿Lograrás llegar al óvulo? 🚀</p>
+<p>Recorré cada etapa, superá los desafíos y llegá a la meta.</p>
+<div style="text-align:center"><button onclick="start()">🚀 ¡EMPEZAR EL VIAJE!</button></div>`;
+}
+function start(){current=0;score=0;renderStage();}
+function progress(){return Math.round((current/stages.length)*100)}
+function renderStage(){
+let s=stages[current];
+document.getElementById("screen").innerHTML=`
+<div class="stage">ETAPA ${current+1} DE ${stages.length}</div>
+<div class="progress"><div class="bar" style="width:${progress()}%"></div></div>
+<h2>${s.title}</h2><p>${s.text}</p>
+<div id="challenge"></div>`;
+if(s.match) renderMatch();
+else if(s.order) renderOrder();
+else renderChoices(s);
+}
+function renderChoices(s){
+let c=document.getElementById("challenge");
+c.innerHTML=`<h3>🎯 Desafío</h3><p><b>${s.q}</b></p>`+
+s.options.map((x,i)=>`<button class="choice" onclick="answer(${i},this)">${String.fromCharCode(65+i)}) ${x}</button>`).join("");
+}
+function answer(i,btn){
+let s=stages[current], buttons=document.querySelectorAll(".choice");
+buttons.forEach(b=>b.disabled=true);
+if(i===s.correct){score++;btn.classList.add("correct");feedback(true,"¡Correcto!");}
+else{btn.classList.add("wrong");feedback(false,"No es correcto. Volvé a intentarlo.");}
+}
+function feedback(ok,msg){
+let c=document.getElementById("challenge");
+let old=document.querySelector(".feedback"); if(old)old.remove();
+let d=document.createElement("div");d.className="feedback "+(ok?"good":"bad");d.innerHTML=msg+
+(ok?`<br><button onclick="next()">➡️ Avanzar</button>`:`<br><button onclick="renderStage()">🔄 Intentar de nuevo</button>`);
+c.appendChild(d);
+}
+function renderMatch(){
+document.getElementById("challenge").innerHTML=`
+<h3>🎯 Desafío 3</h3>
+<p>Uní cada órgano con su función. Elegí la opción correcta para cada uno.</p>
+<div class="route">
+<b>Conducto deferente</b> → Conduce espermatozoides hacia la uretra<br>
+<b>Epidídimo</b> → Lugar de maduración y almacenamiento<br>
+<b>Vesículas seminales</b> → Produce líquido nutritivo
+</div>
+<button onclick="feedback(true,'¡Correcto! Completaste las parejas.')">✅ ¡Correcto! Avanzar</button>`;
+}
+function renderOrder(){
+document.getElementById("challenge").innerHTML=`
+<h3>🎯 Desafío 4 — Ordená el recorrido</h3>
+<p>Seleccioná la secuencia correcta del recorrido:</p>
+<button class="choice" onclick="orderAnswer(false,this)">Uretra → Testículos → Conducto deferente → Epidídimo</button>
+<button class="choice" onclick="orderAnswer(true,this)">Testículos → Epidídimo → Conducto deferente → Uretra</button>
+<button class="choice" onclick="orderAnswer(false,this)">Epidídimo → Testículos → Uretra → Conducto deferente</button>`;
+}
+function orderAnswer(ok,btn){
+document.querySelectorAll("#challenge .choice").forEach(b=>b.disabled=true);
+if(ok){score++;btn.classList.add("correct");feedback(true,"¡Correcto! El recorrido es Testículos → Epidídimo → Conducto deferente → Uretra.");}
+else{btn.classList.add("wrong");feedback(false,"No es correcto. Volvé a intentarlo.");}
+}
+function next(){
+current++;
+if(current<stages.length) renderStage(); else finish();
+}
+function finish(){
+document.getElementById("screen").innerHTML=`
+<h1>💛 ¡LO LOGRASTE!</h1>
+<p class="subtitle">Llegaste a la meta: la fecundación.</p>
+<p>Un solo espermatozoide se une al óvulo. Juntos forman el cigoto, la primera célula de un nuevo ser.</p>
+<h2>🏆 Puntaje: ${score}/${stages.length}</h2>
+<p>🧬 Fin del viaje. ¡Felicitaciones!</p>
+<div style="text-align:center"><button onclick="start()">🔄 Volver a empezar</button></div>`;
+}
+renderStart();
+</script>
+</body>
+</html>
